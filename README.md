@@ -16,3 +16,6 @@ Department of Neurobiology
 Stanford University
 Stanford, CA
 94305
+
+Please note that this code based was designed to run on our custom compute clusters and as such is not runnable out of the box on arbirary systems.
+However, any additional information required to reanalyze the data reported in this paper is available from the lead contact upon request.

@@ -1,3 +1,7 @@
+#######################
+### Import Packages ###
+#######################
+
 import os
 import sys
 import numpy as np
@@ -19,18 +23,13 @@ import umap
 import pickle
 import psutil
 
+#####################
+### Main Function ###
+#####################
+
 def main(args):
 
-	logfile = args['logfile']
-	printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
-
-	dataset_path = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20190101_walking_dataset"
-	fly_names = ['fly_087', 'fly_089', 'fly_094', 'fly_097', 'fly_098', 'fly_099', 'fly_100', 'fly_101', 'fly_105']
-	expt_len = 1000*30*60
-	resolution = 10
-	high_res_timepoints = np.arange(0,expt_len,resolution) #0 to last time at subsample res
-	n_clusters = 2000
-
+    ### This fictrac class helps process behavior data
 	class Fictrac:
 		def __init__ (self, fly_dir, timestamps):
 			self.fictrac_raw = bbb.load_fictrac(os.path.join(fly_dir, 'fictrac'))
@@ -83,6 +82,7 @@ def main(args):
 				self.fictrac['walking'].append(np.zeros(3384))
 				self.fictrac['walking'][-1][np.where(YZ>.2)] = 1
 
+    ### This fly class helps organize data for each fly
 	class Fly:
 		def __init__ (self, fly_name, fly_idx):
 			self.dir = os.path.join(dataset_path, fly_name, 'func_0')
@@ -119,7 +119,18 @@ def main(args):
 					break
 			return cluster_id
 
+	logfile = args['logfile']
+	printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
+
+	dataset_path = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20190101_walking_dataset"
+	fly_names = ['fly_087', 'fly_089', 'fly_094', 'fly_097', 'fly_098', 'fly_099', 'fly_100', 'fly_101', 'fly_105']
+	expt_len = 1000*30*60
+	resolution = 10
+	high_res_timepoints = np.arange(0,expt_len,resolution) #0 to last time at subsample res
+	n_clusters = 2000
+
 	flies = {}
+	### loop  over flies and load and process neural and behavior data based on classes defined above
 	for i, fly in enumerate(fly_names):
 		flies[fly] = Fly(fly_name=fly, fly_idx=i)
 		flies[fly].load_timestamps()
@@ -127,14 +138,16 @@ def main(args):
 		flies[fly].fictrac.interp_fictrac()
 		flies[fly].load_z_depth_correction()
 
+	### loop over z-planes
 	for z in range(49):
 		printlog(F'Z: {z}')
-		#labels_file = '/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/final_9_cluster_labels_2000.npy'
+		### load supervoxels
 		labels_file = '/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/cluster_labels.npy'
 		cluster_model_labels = np.load(labels_file) #z,t
 		cluster_model_labels = cluster_model_labels[z,:]
 
-		brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/superslice_{}.nii".format(z) #<---------- !!!
+		### load neural data
+		brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/superslice_{}.nii".format(z)
 		brain = np.array(nib.load(brain_file).get_data(), copy=True)
 		fly_idx_delete = 3 #(fly_095)
 		brain = np.delete(brain, fly_idx_delete, axis=-1) #### DELETING FLY_095 ####
@@ -142,8 +155,6 @@ def main(args):
 		for i, fly in enumerate(fly_names):
 			flies[fly].load_brain_slice()
 			flies[fly].get_cluster_averages(cluster_model_labels, n_clusters)
-
-		#for i, fly in enumerate(fly_names):
 
 		scores_all = []
 
@@ -157,6 +168,7 @@ def main(args):
 		scores_zpos_unique = []
 		scores_zneg_unique = []
 
+		### loop over supervoxels
 		for cluster_num in range(n_clusters):
 			if cluster_num%100 == 0:
 				printlog(str(cluster_num))
@@ -186,7 +198,11 @@ def main(args):
 				zpos.extend(flies[fly].fictrac.fictrac['Z_pos'][original_z])
 				zneg.extend(flies[fly].fictrac.fictrac['Z_neg'][original_z])
 				walking.extend(flies[fly].fictrac.fictrac['walking'][original_z])
-										   
+						
+			##################
+			### FIT MODELS ###
+			##################
+
 			### ALL ###
 			X = np.stack((ypos, zpos, zneg, walking)).T
 			model = RidgeCV().fit(X,Y)
@@ -228,10 +244,6 @@ def main(args):
 
 		### Save ###
 		save_dir = '/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20210208_inst_uniq_glm'
-		# save_dir_fly = os.path.join(save_dir, fly)
-		# if not os.path.exists(save_dir_fly):
-		# 	os.mkdir(save_dir_fly)
-
 		save_file = os.path.join(save_dir, F'Z{z}.pickle')
 		scores = {'scores_all':scores_all,
 				 'scores_walking':scores_walking,

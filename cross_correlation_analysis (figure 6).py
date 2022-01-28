@@ -1,3 +1,7 @@
+#######################
+### Import Packages ###
+#######################
+
 import os
 import sys
 import numpy as np
@@ -11,16 +15,13 @@ import nibabel as nib
 import bigbadbrain as bbb
 import dataflow as flow
 
+#####################
+### Main Function ###
+#####################
+
 def main(args):
-	logfile = args['logfile']
-	printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
 
-	fly_names = ['fly_087', 'fly_089', 'fly_094', 'fly_097', 'fly_098', 'fly_099', 'fly_100', 'fly_101', 'fly_105']
-	dataset_path = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20190101_walking_dataset"
-	expt_len = 1000*30*60
-	resolution = 10
-	high_res_timepoints = np.arange(0,expt_len,resolution) #0 to last time at subsample res
-
+	### This fly class helps organize data for each fly
 	class Fly:
 		def __init__ (self, fly_name, fly_idx):
 			self.dir = os.path.join(dataset_path, fly_name, 'func_0')
@@ -57,6 +58,7 @@ def main(args):
 					break
 			return cluster_id
 
+	### This fictrac class helps process behavior data
 	class Fictrac:
 		def __init__ (self, fly_dir, timestamps):
 			self.fictrac_raw = bbb.load_fictrac(os.path.join(fly_dir, 'fictrac'))
@@ -101,6 +103,8 @@ def main(args):
 			x_original = np.arange(0,expt_len,camera_rate)
 			self.fictrac['Wi'] = interp1d(x_original, self.fictrac['W'], bounds_error = False, kind = 'nearest')
 
+	### this function loops over every time-step in time_shifts to build a full matrix of each time-stamp
+	### this is done for a given fly, and given z-place, and a given behavior
 	def build_timeshifted_behavior_matrix(time_shifts, fly, z, behavior):
 		# Get correct behavior interp obj
 		if 'Z' in behavior: behavior_i = 'Zi'
@@ -118,31 +122,13 @@ def main(args):
 				fictrac_interp = np.clip(fictrac_interp, a_min=0, a_max=None)
 			if 'neg' in behavior:
 				fictrac_interp = np.clip(fictrac_interp, a_min=None, a_max=0)*-1
-			
-			 #### CONVERT TO ACCELERATION
-			fictrac_interp = np.diff(fictrac_interp)
-			fictrac_interp = np.append(fictrac_interp, 0) #need to add a single value that was removed
 
-			# Split ACCELERATION in +/-
-			if 'plus' in behavior:
-				fictrac_interp = np.clip(fictrac_interp, a_min=0, a_max=None)
-			if 'minus' in behavior:
-				fictrac_interp = np.clip(fictrac_interp, a_min=None, a_max=0)*-1
-			behavior_shifts.append(fictrac_interp)
-
-			 #### CONVERT TO JERK
-			fictrac_interp = np.diff(fictrac_interp)
-			fictrac_interp = np.append(fictrac_interp, 0) #need to add a single value that was removed
-
-			# Split JERK in +/-
-			if 'up' in behavior:
-				fictrac_interp = np.clip(fictrac_interp, a_min=0, a_max=None)
-			if 'down' in behavior:
-				fictrac_interp = np.clip(fictrac_interp, a_min=None, a_max=0)*-1
 			behavior_shifts.append(fictrac_interp)
 
 		return time_shifts, behavior_shifts
 
+	### This function will create a matrix that, for every neural time point, saves a window of behavior
+	### interpolated to match the given vector of time_shifts
 	def build_X (time_shifts, behaviors, z):
 		all_fly_shifts = []
 		for fly in fly_names:
@@ -159,9 +145,18 @@ def main(args):
 		X = np.asarray(all_fly_shifts)
 		return X
 
+	logfile = args['logfile']
+	printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
+	fly_names = ['fly_087', 'fly_089', 'fly_094', 'fly_097', 'fly_098', 'fly_099', 'fly_100', 'fly_101', 'fly_105']
+	dataset_path = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20190101_walking_dataset"
+	expt_len = 1000*30*60
+	resolution = 10
+	high_res_timepoints = np.arange(0,expt_len,resolution) #0 to last time at subsample res
+
 	###################
 	### Build Flies ###
 	###################
+	### loop  over flies and load and process neural and behavior data based on classes defined above
 	flies = {}
 	for i, fly in enumerate(fly_names):
 		flies[fly] = Fly(fly_name=fly, fly_idx=i)
@@ -170,48 +165,41 @@ def main(args):
 		flies[fly].fictrac.interp_fictrac()
 		flies[fly].fictrac.make_walking_vector()
 
+	### these timeshifts define what temporal points to interpolate behavior at relative to 
+	### neural activity at t=0
 	time_shifts = list(range(-5000,5000,20)) # in ms
-	# pos/neg refers to velocity, plus/minus refers to acceleration
-	# behaviors = ['Y_pos_plus', 'Y_pos_minus',
-	# 			 'Z_pos_plus', 'Z_pos_minus',
-	# 			 'Z_neg_plus', 'Z_neg_minus']
-
-	#JERK
-	behaviors = ['Y_pos_plus_up', 'Y_pos_plus_down',
-				 'Y_pos_minus_up', 'Y_pos_minus_down',
-				 'Z_pos_plus_up', 'Z_pos_plus_down']
-				 # 'Z_pos_minus_up', 'Z_pos_minus_down']
-				 # 'Z_neg_plus', 'Z_neg_plus',
-				 # 'Z_neg_minus', 'Z_neg_minus']
+	behaviors = ['Y_pos_plus', 'Z_pos_plus', 'Z_neg_plus',]
 
 	############################################
 	### Build the complete X behavior matrix ###
 	############################################
 	Xs = []
+	### Loop over z-slices
 	for z in range(49):
 		printlog(str(z))
-		X = build_X(time_shifts, behaviors, z)
+		X = build_X(time_shifts, behaviors, z) # build the X behavior matrix
 		Xs.append(X)
 
 	######################
 	### Save Responses ###
 	######################
-	save_file = F"/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20210316_neural_weighted_behavior/master_X_jerk"
+	save_file = F"/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20210316_neural_weighted_behavior/master_X"
 	np.save(save_file, np.asarray(Xs))
-
 
 	##########################################
 	### Weight behavior by neural activity ###
 	##########################################
-
+	### Now that we have created the X behavior matrix, we can weigh each time window by neural activity
 	for z in range(9,49-9):
 			printlog(f"Z:{z}")
 
 			#######################
 			### Load Superslice ###
 			#######################
-			brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/superslice_{}.nii".format(z) #<---------- !!!
+			### A superslice is a single z-plane but all flies have already been concatenated along an axis of this array
+			brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/superslice_{}.nii".format(z)
 			brain = np.array(nib.load(brain_file).get_data(), copy=True)
+			# Delete a fly that is in the superslice but was excluded from all analysis due to not passing quality control
 			fly_idx_delete = 3 #(fly_095)
 			brain = np.delete(brain, fly_idx_delete, axis=-1) #### DELETING FLY_095 ####
 
@@ -253,6 +241,7 @@ def main(args):
 			    ###################
 			    ### Dot Product ###
 			    ###################
+			    ### this is where the magic happens
 			    cluster_response = np.dot(X_cluster,Y)
 			    cluster_responses.append(cluster_response)
 			cluster_responses = np.asarray(cluster_responses)
@@ -260,7 +249,7 @@ def main(args):
 			######################
 			### Save Responses ###
 			######################
-			save_file = F"/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20210316_neural_weighted_behavior/jerk/responses_{z}"
+			save_file = F"/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20210316_neural_weighted_behavior/responses_{z}"
 			np.save(save_file, cluster_responses)
 			brain = None
 			Y = None

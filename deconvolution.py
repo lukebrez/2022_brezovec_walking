@@ -11,6 +11,7 @@ y = fit_eq(x, 1, 4, -1, 8, 0)
 filter_ = y*-1
 filter_padded = np.pad(filter_, (0, 450), 'constant')
 
+### build this into a toeplitz matrix
 toe = scipy.linalg.toeplitz(filter_padded,r=[0]*500)
 plt.imshow(toe)
 
@@ -18,7 +19,6 @@ plt.imshow(toe)
 ### Load Filters ###
 ####################
 main_path = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20210316_neural_weighted_behavior"
-
 response_files = [os.path.join(main_path, file) for file in os.listdir(main_path) if 'responses' in file]
 bbb.sort_nicely(response_files)
 
@@ -30,14 +30,9 @@ responses = np.asarray(responses)
 responses_split = np.reshape(responses, (49-18,2000,4,500))
 responses_notch = signal.filtfilt(b_notch, a_notch, responses_split, axis=-1)
 
-cluster_id = np.argmax(np.sum(responses_notch[20,:,0,:].real, axis=1))
-plt.plot(responses_notch[20,cluster_id,0,:])
-
 ##################
 ### Deconvolve ###
 ##################
-print('deconvolving')
-
 all_signals_unfiltered = np.reshape(responses_split[:,:,:,:],(31*2000,4,500))
 all_signals = np.reshape(responses_notch,(31*2000,4,500))
 

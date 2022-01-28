@@ -1,3 +1,7 @@
+#######################
+### Import Packages ###
+#######################
+
 import numpy as np
 import sys
 import os
@@ -10,9 +14,6 @@ from bigbadbrain.utils import timing
 @timing
 def load_fictrac(directory, file='fictrac.dat'):
     """ Loads fictrac data from .dat file that fictrac outputs.
-
-    To-do: change units based on diameter of ball etc.
-    For speed sanity check, instead remove bad frames so we don't have to throw out whole trial.
 
     Parameters
     ----------

@@ -1,3 +1,7 @@
+#######################
+### Import Packages ###
+#######################
+
 import numpy as np
 import os
 import sys
@@ -9,16 +13,22 @@ import dataflow as flow
 import matplotlib.pyplot as plt
 from contextlib import contextmanager
 import warnings
-warnings.filterwarnings("ignore")
-
 from shutil import copyfile
-
+warnings.filterwarnings("ignore")
 import platform
 if platform.system() != 'Windows':
     sys.path.insert(0, '/home/users/brezovec/.local/lib/python3.6/site-packages/lib/python/')
     import ants
 
+#####################
+### Main Function ###
+#####################
+
 def main(args):
+
+	###############################################
+	### Parse the dictionary of input arguments ###
+	###############################################
 
     logfile = args['logfile']
     save_directory = args['save_directory']
@@ -27,22 +37,27 @@ def main(args):
     type_of_transform = args['type_of_transform'] # SyN or Affine
     save_warp_params = args['save_warp_params']
 
+    ### Brain space you are warping into
     fixed_path = args['fixed_path']
     fixed_fly = args['fixed_fly']
     fixed_resolution = args['fixed_resolution']
 
+    ### Brain that is being warped
     moving_path = args['moving_path']
     moving_fly = args['moving_fly']
     moving_resolution = args['moving_resolution']
 
+    ### Downsample if you like
     low_res = args['low_res']
     very_low_res = args['very_low_res']
 
+    ### Specific to ANTs SyN transform
     grad_step = args['grad_step']
     flow_sigma = args['flow_sigma']
     total_sigma = args['total_sigma']
     syn_sampling = args['syn_sampling']
 
+    ### Mimic is an optional 2nd brain to warp based on the warp params of moving to fixed
     try:
         mimic_path = args['mimic_path']
         mimic_fly = args['mimic_fly']
@@ -52,6 +67,7 @@ def main(args):
         mimic_fly = None
         mimic_resolution = None
 
+    ### this pringlogging is custom to our system
     width = 120
     printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
 
@@ -99,7 +115,7 @@ def main(args):
     #############
 
     t0=time()
-    with stderr_redirected(): # to prevent dumb itk gaussian error bullshit infinite printing
+    with stderr_redirected(): # to prevent itk gaussian error infinite printing
         moco = ants.registration(fixed,
                                  moving,
                                  type_of_transform=type_of_transform,
@@ -150,24 +166,15 @@ def main(args):
     ### Save ###
     ############
 
-    # NOT SAVING MIMIC <------ MAY NEED TO CHANGE
     if flip_X:
         save_file = os.path.join(save_directory, moving_fly + '_m' + '-to-' + fixed_fly)
-        #save_file = os.path.join(save_directory, mimic_fly + '_m' + '-to-' + fixed_fly + '.nii')
     else:
         save_file = os.path.join(save_directory, moving_fly + '-to-' + fixed_fly)
-        #save_file = os.path.join(save_directory, mimic_fly + '-to-' + fixed_fly + '.nii')
-    #nib.Nifti1Image(mimic_moco.numpy(), np.eye(4)).to_filename(save_file)
     if low_res:
         save_file += '_lowres'
     save_file += '.nii'
     nib.Nifti1Image(moco['warpedmovout'].numpy(), np.eye(4)).to_filename(save_file)
 
-    # if flip_X:
-    #     save_file = os.path.join(save_directory, moving_fly + '_m' + '-to-' + fixed_fly + '.nii')
-    # else:
-    #     save_file = os.path.join(save_directory, moving_fly + '-to-' + fixed_fly + '.nii')
-    # nib.Nifti1Image(moco['warpedmovout'].numpy(), np.eye(4)).to_filename(save_file)
 
 def sec_to_hms(t):
         secs=F"{np.floor(t%60):02.0f}"

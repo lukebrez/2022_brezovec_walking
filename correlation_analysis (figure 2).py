@@ -1,3 +1,7 @@
+#######################
+### Import Packages ###
+#######################
+
 import os
 import sys
 import numpy as np
@@ -14,8 +18,14 @@ import nibabel as nib
 import bigbadbrain as bbb
 import dataflow as flow
 
+#####################
+### Main Function ###
+#####################
+
 def main(args):
 
+
+    ### This fly class helps organize data for each fly
     class Fly:
         def __init__ (self, fly_name, fly_idx):
             self.dir = os.path.join(dataset_path, fly_name, 'func_0')
@@ -49,6 +59,7 @@ def main(args):
                     break
             return cluster_id
 
+    ### This fictrac class helps process behavior data
     class Fictrac:
         def __init__ (self, fly_dir, timestamps):
             self.fictrac_raw = bbb.load_fictrac(os.path.join(fly_dir, 'fictrac'))
@@ -88,11 +99,6 @@ def main(args):
                 self.fictrac[short + '_pos'] = np.clip(self.fictrac[short], a_min=0, a_max=None)
                 self.fictrac[short + '_neg'] = np.clip(self.fictrac[short], a_min=None, a_max=0)*-1
                 
-                ### Strongly Clipped Velocities ###
-                # excludes points even close to 0
-                #self.fictrac[short + '_pos_very'] = np.clip(self.fictrac[short], a_min=0.3, a_max=None)
-                #self.fictrac[short + '_neg_very'] = np.clip(self.fictrac[short], a_min=None, a_max=-0.3)*-1
-
                 ### Acceleration ###
                 high_res_behavior = self.pull_from_interp_object(interp_object, high_res_timepoints)
                 self.fictrac[short + 'h'] = high_res_behavior/np.std(high_res_behavior)
@@ -111,12 +117,16 @@ def main(args):
             self.fictrac['YZ'] = np.sqrt(np.power(self.fictrac['Y'],2), np.power(self.fictrac['Z'],2))
             self.fictrac['YZh'] = np.sqrt(np.power(self.fictrac['Yh'],2), np.power(self.fictrac['Zh'],2))
 
+    ###############################################
+    ### Parse the dictionary of input arguments ###
+    ###############################################
+
     logfile = args['logfile']
     save_directory = args['save_directory']
     z = args['z']
     behavior_to_corr = args['behavior_to_corr']
 
-
+    ### this pringlogging is custom to our system
     printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
     printlog('{},{}'.format(behavior_to_corr, z))
 
@@ -129,10 +139,10 @@ def main(args):
     #######################
     ### Load Superslice ###
     #######################
-    brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/superslice_{}.nii".format(z) #<---------- !!!
-    #RED!!!!:
-    #brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/red/superslice_{}.nii".format(z) #<---------- !!!
+    ### A superslice is a single z-plane but all flies have already been concatenated along an axis of this array
+    brain_file = "/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/superslice_{}.nii".format(z)
     brain = np.array(nib.load(brain_file).get_data(), copy=True)
+    # Delete a fly that is in the superslice but was excluded from all analysis due to not passing quality control
     fly_idx_delete = 3 #(fly_095)
     brain = np.delete(brain, fly_idx_delete, axis=-1) #### DELETING FLY_095 ####
 
@@ -140,8 +150,8 @@ def main(args):
     ### Load Clusters ###
     #####################
 
+    # these are the supervoxels
     n_clusters = 2000
-    #labels_file = '/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/final_9_cluster_labels_2000.npy'
     labels_file = '/oak/stanford/groups/trc/data/Brezovec/2P_Imaging/20201129_super_slices/cluster_labels.npy'
     cluster_model_labels = np.load(labels_file)
     cluster_model_labels = cluster_model_labels[z,:]
@@ -149,6 +159,7 @@ def main(args):
     ###################
     ### Build Flies ###
     ###################
+    ### loop  over flies and load and process neural and behavior data based on classes defined above
     flies = {}
     for i, fly in enumerate(fly_names):
         flies[fly] = Fly(fly_name=fly, fly_idx=i)
@@ -161,6 +172,7 @@ def main(args):
     #####################
     ### Pool behavior ###
     #####################
+    ### concatentate behavior across flies
     not_clipped_behaviors = ['Y', 'Z', 'Ya', 'Za']
     clipped_behaviors = ['Y_pos', 'Y_neg',
                          'Z_pos', 'Z_neg',
@@ -181,6 +193,7 @@ def main(args):
     
     r_values = []
     p_values = []
+    # looping over supervoxels in a given slice
     for cluster in range(n_clusters):
         pooled_activity = []
         for fly in flies:
@@ -190,7 +203,7 @@ def main(args):
         Y = pooled_activity
         X = pooled_behavior[behavior_to_corr]
 
-        r, p = scipy.stats.pearsonr(X, Y)
+        r, p = scipy.stats.pearsonr(X, Y) # calculate correlation
         r_values.append(r)
         p_values.append(p)
 
@@ -200,9 +213,6 @@ def main(args):
         # t = (r*np.sqrt(n-2))/(np.sqrt(1-r**2))
         # p_manual = scipy.stats.t.sf(abs(t), df=n-2)*2
         # p_values_t_test.append(p_manual)
-
-        # if cluster%100 == 0:
-        #     printlog(str(cluster))
 
     #####################
     ### Save Map Data ###

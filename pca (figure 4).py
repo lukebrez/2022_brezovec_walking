@@ -1,15 +1,23 @@
+#######################
+### Import Packages ###
+#######################
+
 import sys
 import numpy as np
 import json
 import time
 import dataflow as flow
 import pickle
-
 from sklearn.decomposition import PCA
 from sklearn.decomposition import IncrementalPCA
 
+#####################
+### Main Function ###
+#####################
+
 def main(args):
 
+    ### parse input dictionary
     logfile = args['logfile']
     fly_idx = args['fly_idx']
     printlog = getattr(flow.Printlog(logfile=logfile), 'print_to_log')
@@ -32,16 +40,14 @@ def main(args):
     X = np.reshape(X,(-1, 30456))
     X = X.T
 
-
     printlog('X is time by voxels {}'.format(X.shape))
     num_tp = 3384
     start = fly_idx*num_tp
     stop = (fly_idx+1)*num_tp
-    X = X[start:stop,:]
+    X = X[start:stop,:] ### grab neural data for the right fly. 
     printlog(F'fly_idx: {fly_idx}, start: {start}, stop: {stop}')
     printlog('After fly_idx, X is time by voxels {}'.format(X.shape))
 
-    
     printlog('Using np.linalg.ein')
     covariance_matrix = np.cov(X.T)
     eigen_values, eigen_vectors = np.linalg.eig(covariance_matrix)

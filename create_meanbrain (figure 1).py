@@ -1,3 +1,7 @@
+#######################
+### Import Packages ###
+#######################
+
 import os
 import sys
 import json
@@ -12,9 +16,12 @@ from contextlib import contextmanager
 from skimage.filters import threshold_triangle as triangle
 from sklearn.preprocessing import quantile_transform
 from skimage.filters import unsharp_mask
-
 sys.path.insert(0, '/home/users/brezovec/.local/lib/python3.6/site-packages/lib/python/')
 import ants
+
+#####################
+### Main Function ###
+#####################
 
 def main():
 	'''

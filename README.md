@@ -1,5 +1,7 @@
 # 2022_brezovec_walking
 
+[![DOI](https://zenodo.org/badge/451286138.svg)](https://zenodo.org/badge/latestdoi/451286138)
+
 Custom code associated with:
 
 Mapping the Neural Dynamics of Locomotion across the Drosophila Brain 
